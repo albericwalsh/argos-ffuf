@@ -2,7 +2,7 @@
     "id": "ffuf",
     "name": "Ffuf",
     "version": "1.0",
-    "repository": "",
+    "repository": "https://github.com/albericwalsh/argos-ffuf",
     "category": "Network Scanning",
     "description": "Ffuf est un outil de force brute de sous-domaines rapide et efficace, conçu pour découvrir les sous-domaines d'un domaine cible. Il utilise une approche de force brute intelligente en combinant des listes de mots personnalisables avec des techniques de permutation pour générer des noms de sous-domaines potentiels. Ffuf est particulièrement utile pour les professionnels de la sécurité, les pentesters et les chercheurs en sécurité qui cherchent à identifier les points d'entrée potentiels dans une infrastructure réseau.",
     "parameters": [
