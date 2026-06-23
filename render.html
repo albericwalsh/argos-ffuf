@@ -1,0 +1,205 @@
+{#
+  render.html — Argos module renderer : ffuf
+  Context variables injected by report_engine:
+    step       : dict  — the raw step data from mission result
+    step_id    : str   — e.g. "step1"
+    step_index : int   — 0-based index
+    module     : dict  — parsed module.json
+#}
+{% set results = (step.get("output") or []) | tojson | fromjson %}
+
+{# Groupe les résultats par base_url pour afficher une section par cible #}
+{% set targets = [] %}
+{% for r in results %}
+  {% set bu = r.get("base_url", "") %}
+  {% if bu not in targets %}{% set _ = targets.append(bu) %}{% endif %}
+{% endfor %}
+
+<div class="mod-section">
+  <div class="mod-header">
+    <div class="mod-header-left">
+      <span class="mod-icon">⟁</span>
+      <div>
+        <div class="mod-name">{{ module.name }}</div>
+        <div class="mod-meta">{{ module.category }} · {{ step_id }}</div>
+      </div>
+    </div>
+    <div class="mod-stats">
+      <div class="mod-stat">
+        <span class="mod-stat-num" style="color:var(--accent)">{{ results | length }}</span>
+        <span class="mod-stat-lbl">chemins trouvés</span>
+      </div>
+      {% set redirects = results | selectattr("redirect") | list | length %}
+      <div class="mod-stat">
+        <span class="mod-stat-num">{{ redirects }}</span>
+        <span class="mod-stat-lbl">redirections</span>
+      </div>
+      {% set s200 = results | selectattr("status", "equalto", 200) | list | length %}
+      <div class="mod-stat">
+        <span class="mod-stat-num" style="color:var(--accent)">{{ s200 }}</span>
+        <span class="mod-stat-lbl">codes 200</span>
+      </div>
+    </div>
+  </div>
+
+  {% if results %}
+
+  {% for base_url in targets %}
+  {% set group = results | selectattr("base_url", "equalto", base_url) | list %}
+  <div class="target-block">
+
+    {% if base_url %}
+    <div class="target-header">
+      <span class="target-label">cible</span>
+      <span class="target-url">{{ base_url }}</span>
+      <span class="target-count">{{ group | length }} résultat{{ 's' if group | length > 1 }}</span>
+    </div>
+    {% endif %}
+
+    <div class="table-wrap {% if not loop.last %}table-no-radius{% endif %}">
+      <table class="mod-table">
+        <thead>
+          <tr>
+            <th>Chemin</th>
+            <th>Statut</th>
+            <th>Taille</th>
+            <th>Mots</th>
+            <th>Lignes</th>
+            <th>Redirection</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in group %}
+          {% set has_redirect = r.get("redirect") and r["redirect"] | length > 0 %}
+          <tr class="{% if has_redirect %}has-redirect{% endif %}">
+            <td>
+              {% if base_url %}
+              <a class="path-link" href="{{ base_url }}/{{ r.get('path', '') }}" target="_blank" rel="noopener">
+                <span class="path-base">{{ base_url }}/</span><span class="path-pill">{{ r.get("path", "—") }}</span>
+              </a>
+              {% else %}
+              <span class="path-pill">{{ r.get("path", "—") }}</span>
+              {% endif %}
+            </td>
+            <td>
+              {% set st = r.get("status", "") | string %}
+              <span class="status-badge status-{{ st }}">{{ st }}</span>
+            </td>
+            <td class="cell-mono">{{ r.get("size", 0) }} <span class="unit">B</span></td>
+            <td class="cell-mono">{{ r.get("words", 0) }}</td>
+            <td class="cell-mono">{{ r.get("lines", 0) }}</td>
+            <td class="cell-muted">
+              {% if has_redirect %}
+              <span class="redirect-arrow">→</span> {{ r["redirect"] }}
+              {% else %}
+              —
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endfor %}
+
+  {% else %}
+  <div class="mod-empty">Aucun chemin découvert.</div>
+  {% endif %}
+</div>
+
+<style>
+  .mod-section { margin-bottom: 28px; }
+
+  .mod-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: 4px 4px 0 0;
+  }
+  .mod-header-left { display: flex; align-items: center; gap: 12px; }
+  .mod-icon { font-size: 20px; color: var(--accent); line-height: 1; opacity: .7; }
+  .mod-name { font-size: 13px; font-weight: 600; }
+  .mod-meta { font-family: var(--font-mono); font-size: 10px; color: var(--muted); margin-top: 1px; }
+
+  .mod-stats { display: flex; gap: 24px; }
+  .mod-stat { text-align: right; }
+  .mod-stat-num { font-family: var(--font-mono); font-size: 18px; font-weight: 700; display: block; line-height: 1; }
+  .mod-stat-lbl { font-family: var(--font-mono); font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+
+  /* ── Bandeau cible ── */
+  .target-block { margin-bottom: 0; }
+  .target-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 14px;
+    background: rgba(0,229,160,.05);
+    border: 1px solid var(--border);
+    border-bottom: none;
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+  .target-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--accent);
+    opacity: .7;
+  }
+  .target-url {
+    color: var(--accent);
+    font-weight: 600;
+    flex: 1;
+  }
+  .target-count {
+    color: var(--muted);
+    font-size: 10px;
+  }
+
+  .table-wrap { border: 1px solid var(--border); border-radius: 0 0 4px 4px; overflow: hidden; margin-bottom: 8px; }
+  .table-no-radius { border-radius: 0; }
+
+  .mod-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .mod-table th {
+    font-family: var(--font-mono); font-size: 9px; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--muted); padding: 8px 12px;
+    text-align: left; background: var(--surface2, #1c1c20);
+    border-bottom: 1px solid var(--border);
+  }
+  .mod-table td {
+    padding: 9px 12px; border-bottom: 1px solid rgba(42,42,46,.5); vertical-align: middle;
+  }
+  .mod-table tr:last-child td { border-bottom: none; }
+  .mod-table tr.has-redirect:hover td { background: rgba(0,229,160,.03); }
+
+  .path-link { text-decoration: none; display: block; }
+  .path-link:hover .path-pill { text-decoration: underline; }
+  .path-base { font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
+  .path-pill { font-family: var(--font-mono); font-size: 12px; font-weight: 700; color: var(--accent); word-break: break-all; }
+
+  /* Codes HTTP */
+  .status-badge {
+    font-family: var(--font-mono); font-size: 9px; font-weight: 600;
+    text-transform: uppercase; padding: 2px 6px; border-radius: 3px;
+  }
+  .status-badge[class*="status-2"] { background: rgba(0,229,160,.1);   color: var(--accent); border: 1px solid rgba(0,229,160,.25); }
+  .status-badge[class*="status-3"] { background: rgba(245,166,35,.1);  color: #f5a623;       border: 1px solid rgba(245,166,35,.25); }
+  .status-badge[class*="status-4"] { background: rgba(255,77,77,.1);   color: #ff4d4d;       border: 1px solid rgba(255,77,77,.25); }
+  .status-badge[class*="status-5"] { background: rgba(180,60,255,.1);  color: #b43cff;       border: 1px solid rgba(180,60,255,.25); }
+
+  .redirect-arrow { color: var(--accent); font-weight: 700; margin-right: 4px; }
+  .unit      { color: var(--muted); font-size: 9px; }
+  .cell-muted { color: var(--muted); font-size: 11px; word-break: break-all; }
+  .cell-mono  { font-family: var(--font-mono); font-size: 11px; }
+
+  .mod-empty {
+    padding: 32px; text-align: center; color: var(--muted);
+    font-family: var(--font-mono); font-size: 11px;
+    border: 1px solid var(--border); border-top: none; border-radius: 0 0 4px 4px;
+  }
+</style>
